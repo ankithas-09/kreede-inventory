@@ -66,10 +66,16 @@ const MASTER_ITEMS: InventoryItem[] = [
   // ===== Raw Materials (15 days once) =====
   { category: "Raw Materials (15 days once)", name: "Oil" },
   { category: "Raw Materials (15 days once)", name: "Salt" },
-  { category: "Raw Materials (15 days once)", name: "Channa/black channa (kadlekalu)" },
+  {
+    category: "Raw Materials (15 days once)",
+    name: "Channa/black channa (kadlekalu)",
+  },
   { category: "Raw Materials (15 days once)", name: "Chickpeas (white)" },
   { category: "Raw Materials (15 days once)", name: "Greengram" },
-  { category: "Raw Materials (15 days once)", name: "Masala peanuts (Congress kadle)" },
+  {
+    category: "Raw Materials (15 days once)",
+    name: "Masala peanuts (Congress kadle)",
+  },
   { category: "Raw Materials (15 days once)", name: "Soya Chunks" },
   { category: "Raw Materials (15 days once)", name: "Chili Oil" },
   { category: "Raw Materials (15 days once)", name: "Mayonnaise" },
@@ -98,14 +104,20 @@ const MASTER_ITEMS: InventoryItem[] = [
   { category: "Masalas and spices (depends)", name: "Pepper powder" },
   { category: "Masalas and spices (depends)", name: "Black salt" },
   { category: "Masalas and spices (depends)", name: "Pink salt" },
-  { category: "Masalas and spices (depends)", name: "Kashmiri red chilly powder" },
+  {
+    category: "Masalas and spices (depends)",
+    name: "Kashmiri red chilly powder",
+  },
   { category: "Masalas and spices (depends)", name: "Coriander powder" },
   { category: "Masalas and spices (depends)", name: "Jeera powder" },
   { category: "Masalas and spices (depends)", name: "Onion powder" },
   { category: "Masalas and spices (depends)", name: "Garlic powder" },
   { category: "Masalas and spices (depends)", name: "Ginger powder" },
   { category: "Masalas and spices (depends)", name: "Garam masala" },
-  { category: "Masalas and spices (depends)", name: "Dry mango powder (aamchur)" },
+  {
+    category: "Masalas and spices (depends)",
+    name: "Dry mango powder (aamchur)",
+  },
   { category: "Masalas and spices (depends)", name: "Chat masala" },
   { category: "Masalas and spices (depends)", name: "Chole masala" },
   { category: "Masalas and spices (depends)", name: "Peri peri masala" },
@@ -140,6 +152,17 @@ export default function InventoryForm({ initialDate }: Props) {
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState("");
 
+  // chef-added items
+  const [customItems, setCustomItems] = useState<InventoryItem[]>([]);
+  const [showAddItem, setShowAddItem] = useState(false);
+  const [newItemCategory, setNewItemCategory] = useState("");
+  const [newItemName, setNewItemName] = useState("");
+
+  // delete panel
+  const [showDeleteItem, setShowDeleteItem] = useState(false);
+  const [deleteSearch, setDeleteSearch] = useState("");
+  const [hiddenItems, setHiddenItems] = useState<string[]>([]); // keys: category__name
+
   // inventory data (amount spent) part
   const [spendDate, setSpendDate] = useState<string>(
     new Date().toISOString().slice(0, 10)
@@ -148,16 +171,32 @@ export default function InventoryForm({ initialDate }: Props) {
   const [spendList, setSpendList] = useState<SpendEntry[]>([]);
   const [spendSaving, setSpendSaving] = useState(false);
 
+  // categories only from master
+  const allCategories = useMemo(() => {
+    const set = new Set<string>();
+    MASTER_ITEMS.forEach((it) => set.add(it.category));
+    return Array.from(set);
+  }, []);
+
+  // all items before hiding
+  const allItems = useMemo(
+    () => [...MASTER_ITEMS, ...customItems],
+    [customItems]
+  );
+
+  // grouped master + custom, then hide items in hiddenItems
   const grouped = useMemo(() => {
     const map: Record<string, InventoryItem[]> = {};
-    MASTER_ITEMS.forEach((it) => {
+    allItems.forEach((it) => {
+      const key = `${it.category}__${it.name}`;
+      if (hiddenItems.includes(key)) return; // skip hidden
       if (!map[it.category]) map[it.category] = [];
       map[it.category].push(it);
     });
     return map;
-  }, []);
+  }, [allItems, hiddenItems]);
 
-  // load inventory for selected date
+  // load inventory
   useEffect(() => {
     async function fetchData() {
       const res = await fetch(`/api/inventory?date=${date}`);
@@ -173,6 +212,8 @@ export default function InventoryForm({ initialDate }: Props) {
       } else {
         setQuantities({});
       }
+      // on date change, you might want to reset hidden items
+      setHiddenItems([]);
     }
     if (date) fetchData();
   }, [date]);
@@ -199,16 +240,20 @@ export default function InventoryForm({ initialDate }: Props) {
   async function handleSave() {
     setSaving(true);
     setStatus("");
-    const items = MASTER_ITEMS.map((it) => ({
-      category: it.category,
-      name: it.name,
-      quantity: quantities[`${it.category}__${it.name}`] || "",
-    }));
+
+    // save only visible items (i.e. skip hidden)
+    const itemsToSave = allItems
+      .filter((it) => !hiddenItems.includes(`${it.category}__${it.name}`))
+      .map((it) => ({
+        category: it.category,
+        name: it.name,
+        quantity: quantities[`${it.category}__${it.name}`] || "",
+      }));
 
     const res = await fetch("/api/inventory", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ date, items }),
+      body: JSON.stringify({ date, items: itemsToSave }),
     });
 
     if (res.ok) {
@@ -234,8 +279,8 @@ export default function InventoryForm({ initialDate }: Props) {
     doc.setFont(FONT, "normal");
     doc.setFontSize(10);
 
-    // only filled items
-    const filledItems = MASTER_ITEMS
+    const filledItems = allItems
+      .filter((it) => !hiddenItems.includes(`${it.category}__${it.name}`))
       .map((it) => {
         const key = `${it.category}__${it.name}`;
         const qty = quantities[key]?.trim() ?? "";
@@ -267,7 +312,6 @@ export default function InventoryForm({ initialDate }: Props) {
     doc.save(`inventory-${displayDate.replace(/\//g, "-")}.pdf`);
   }
 
-  // save amount spent
   async function handleSpendSave() {
     if (!spendAmount.trim()) return;
     setSpendSaving(true);
@@ -281,8 +325,6 @@ export default function InventoryForm({ initialDate }: Props) {
       body: JSON.stringify(payload),
     });
     if (res.ok) {
-      const data = await res.json();
-      // reload list
       const listRes = await fetch("/api/inventory-spend");
       const listData = await listRes.json();
       setSpendList(listData);
@@ -291,22 +333,154 @@ export default function InventoryForm({ initialDate }: Props) {
     setSpendSaving(false);
   }
 
+  function handleAddItem() {
+    if (!newItemCategory || !newItemName.trim()) return;
+    const item: InventoryItem = {
+      category: newItemCategory,
+      name: newItemName.trim(),
+    };
+    setCustomItems((prev) => {
+      const exists = prev.some(
+        (p) => p.category === item.category && p.name === item.name
+      );
+      if (exists) return prev;
+      return [...prev, item];
+    });
+    setNewItemName("");
+    setShowAddItem(false);
+  }
+
+  // delete item handler
+  function handleDeleteItem(key: string) {
+    setHiddenItems((prev) => {
+      if (prev.includes(key)) return prev;
+      return [...prev, key];
+    });
+    setDeleteSearch("");
+    setShowDeleteItem(false);
+  }
+
+  // filter items for delete search
+  const deleteCandidates = allItems
+    .filter((it) => !hiddenItems.includes(`${it.category}__${it.name}`))
+    .filter((it) =>
+      deleteSearch.trim()
+        ? it.name.toLowerCase().includes(deleteSearch.toLowerCase()) ||
+          it.category.toLowerCase().includes(deleteSearch.toLowerCase())
+        : true
+    )
+    .slice(0, 10); // limit to 10 results
+
   return (
     <div className="inventory-wrapper">
       {/* INVENTORY SECTION */}
       <div className="inventory-header">
         <h1>Daily Inventory</h1>
-        <div className="date-row">
-          <label htmlFor="date">Date</label>
-          <input
-            id="date"
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-          />
-          <small>Selected: {toDisplayDate(date)}</small>
+        <div className="inventory-header-actions">
+          <div className="date-row">
+            <label htmlFor="date">Date</label>
+            <input
+              id="date"
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+            />
+            <small>Selected: {toDisplayDate(date)}</small>
+          </div>
+          <button
+            type="button"
+            className="add-item-btn"
+            onClick={() => {
+              setShowAddItem((p) => !p);
+              setShowDeleteItem(false);
+              if (!newItemCategory) {
+                setNewItemCategory(allCategories[0] || "");
+              }
+            }}
+          >
+            + Add Item
+          </button>
+          <button
+            type="button"
+            className="delete-item-btn"
+            onClick={() => {
+              setShowDeleteItem((p) => !p);
+              setShowAddItem(false);
+            }}
+          >
+            Delete Item
+          </button>
         </div>
       </div>
+
+      {showAddItem && (
+        <div className="add-item-bar">
+          <select
+            className="add-item-select"
+            value={newItemCategory}
+            onChange={(e) => setNewItemCategory(e.target.value)}
+          >
+            {allCategories.map((cat) => (
+              <option key={cat} value={cat}>
+                {cat}
+              </option>
+            ))}
+          </select>
+          <input
+            className="add-item-input"
+            type="text"
+            placeholder="Enter item name"
+            value={newItemName}
+            onChange={(e) => setNewItemName(e.target.value)}
+          />
+          <button className="add-item-submit" onClick={handleAddItem}>
+            Add
+          </button>
+          <button
+            className="add-item-close"
+            onClick={() => setShowAddItem(false)}
+          >
+            Close
+          </button>
+        </div>
+      )}
+
+      {showDeleteItem && (
+        <div className="delete-item-bar">
+          <input
+            className="delete-item-input"
+            type="text"
+            placeholder="Search item to delete..."
+            value={deleteSearch}
+            onChange={(e) => setDeleteSearch(e.target.value)}
+          />
+          <button
+            className="add-item-close"
+            onClick={() => setShowDeleteItem(false)}
+          >
+            Close
+          </button>
+          <div className="delete-item-list">
+            {deleteCandidates.length === 0 && (
+              <div className="delete-item-empty">No matching items</div>
+            )}
+            {deleteCandidates.map((it) => {
+              const key = `${it.category}__${it.name}`;
+              return (
+                <button
+                    key={key}
+                    type="button"
+                    className="delete-item-row"
+                    onClick={() => handleDeleteItem(key)}
+                >
+                  <span className="delete-item-name">{it.name}</span>
+                  <span className="delete-item-cat">{it.category}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <div className="inventory-sections">
         {Object.entries(grouped).map(([cat, items]) => (
@@ -390,8 +564,8 @@ export default function InventoryForm({ initialDate }: Props) {
               )}
               {spendList.map((row) => (
                 <tr key={row._id || row.date}>
-                    <td>{toDisplayDate(row.date)}</td>
-                    <td>{row.amount}</td>
+                  <td>{toDisplayDate(row.date)}</td>
+                  <td>{row.amount}</td>
                 </tr>
               ))}
             </tbody>
