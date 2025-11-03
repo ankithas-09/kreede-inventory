@@ -7,23 +7,35 @@ if (!MONGODB_URI) {
   throw new Error("Please define the MONGODB_URI environment variable");
 }
 
+// We'll cache connections per DB name
 let cached = (global as any).mongoose;
 
 if (!cached) {
-  cached = (global as any).mongoose = { conn: null, promise: null };
+  cached = (global as any).mongoose = { conn: {}, promise: {} };
 }
 
-export async function dbConnect() {
-  if (cached.conn) return cached.conn;
+type DbConnectOpts = {
+  dbName?: string;
+};
 
-  if (!cached.promise) {
-    cached.promise = mongoose
+export async function dbConnect(opts?: DbConnectOpts) {
+  const dbName = opts?.dbName || process.env.MONGODB_DB || "kreede-inventory";
+
+  // if we already have a connection for this db, return it
+  if (cached.conn[dbName]) {
+    return cached.conn[dbName];
+  }
+
+  // if we don't have a promise for this db, create one
+  if (!cached.promise[dbName]) {
+    cached.promise[dbName] = mongoose
       .connect(MONGODB_URI, {
-        dbName: process.env.MONGODB_DB || "kreede-inventory",
+        dbName,
       })
       .then((mongoose) => mongoose);
   }
 
-  cached.conn = await cached.promise;
-  return cached.conn;
+  // wait for connection
+  cached.conn[dbName] = await cached.promise[dbName];
+  return cached.conn[dbName];
 }

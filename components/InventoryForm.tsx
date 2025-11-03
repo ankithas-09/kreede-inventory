@@ -5,134 +5,17 @@ import { useEffect, useMemo, useState } from "react";
 import jsPDF from "jspdf";
 
 type InventoryItem = {
+  _id?: string;
   category: string;
   name: string;
+  active?: boolean;
 };
 
 type SpendEntry = {
   _id?: string;
-  date: string; // ISO in DB
+  date: string; // ISO
   amount: number;
 };
-
-const MASTER_ITEMS: InventoryItem[] = [
-  // ===== Fresh Procurement (daily) =====
-  { category: "Fresh Procurement (daily)", name: "Milk" },
-  { category: "Fresh Procurement (daily)", name: "Yogurt" },
-  { category: "Fresh Procurement (daily)", name: "Paneer" },
-  { category: "Fresh Procurement (daily)", name: "Garlic herb butter" },
-  { category: "Fresh Procurement (daily)", name: "Cream" },
-  { category: "Fresh Procurement (daily)", name: "Sandwich Bread" },
-  { category: "Fresh Procurement (daily)", name: "Cheese – amul diced" },
-  { category: "Fresh Procurement (daily)", name: "Mozzarella Block" },
-  { category: "Fresh Procurement (daily)", name: "Processed cheese cubes" },
-
-  // ===== Exotic Veggies (alternate days) =====
-  { category: "Exotic Veggies (alternate days)", name: "Mushroom" },
-  { category: "Exotic Veggies (alternate days)", name: "English Cucumber" },
-  { category: "Exotic Veggies (alternate days)", name: "Baby corn" },
-  { category: "Exotic Veggies (alternate days)", name: "Broccoli" },
-  { category: "Exotic Veggies (alternate days)", name: "Lettuce" },
-  { category: "Exotic Veggies (alternate days)", name: "Sweetcorn" },
-
-  // ===== Local Veggies (alternate days) =====
-  { category: "Local Veggies (alternate days)", name: "Potato" },
-  { category: "Local Veggies (alternate days)", name: "Tomato" },
-  { category: "Local Veggies (alternate days)", name: "Green chillies" },
-  { category: "Local Veggies (alternate days)", name: "Capsicum" },
-  { category: "Local Veggies (alternate days)", name: "Onion" },
-  { category: "Local Veggies (alternate days)", name: "Beetroot" },
-  { category: "Local Veggies (alternate days)", name: "Carrot" },
-  { category: "Local Veggies (alternate days)", name: "Cucumber" },
-  { category: "Local Veggies (alternate days)", name: "Spinach" },
-  { category: "Local Veggies (alternate days)", name: "Lemon" },
-  { category: "Local Veggies (alternate days)", name: "Coriander" },
-  { category: "Local Veggies (alternate days)", name: "Curry Leaves" },
-  { category: "Local Veggies (alternate days)", name: "Mint leaves" },
-  { category: "Local Veggies (alternate days)", name: "Garlic peeled" },
-  { category: "Local Veggies (alternate days)", name: "Ginger" },
-
-  // ===== Fruits (Alternate days) =====
-  { category: "Fruits (Alternate days)", name: "Apple" },
-  { category: "Fruits (Alternate days)", name: "Banana" },
-  { category: "Fruits (Alternate days)", name: "Pomegranate" },
-  { category: "Fruits (Alternate days)", name: "Papaya" },
-  { category: "Fruits (Alternate days)", name: "Guava" },
-  { category: "Fruits (Alternate days)", name: "Pineapple" },
-  { category: "Fruits (Alternate days)", name: "Watermelon" },
-  { category: "Fruits (Alternate days)", name: "Muskmelon" },
-  { category: "Fruits (Alternate days)", name: "Avocado" },
-
-  // ===== Raw Materials (15 days once) =====
-  { category: "Raw Materials (15 days once)", name: "Oil" },
-  { category: "Raw Materials (15 days once)", name: "Salt" },
-  {
-    category: "Raw Materials (15 days once)",
-    name: "Channa/black channa (kadlekalu)",
-  },
-  { category: "Raw Materials (15 days once)", name: "Chickpeas (white)" },
-  { category: "Raw Materials (15 days once)", name: "Greengram" },
-  {
-    category: "Raw Materials (15 days once)",
-    name: "Masala peanuts (Congress kadle)",
-  },
-  { category: "Raw Materials (15 days once)", name: "Soya Chunks" },
-  { category: "Raw Materials (15 days once)", name: "Chili Oil" },
-  { category: "Raw Materials (15 days once)", name: "Mayonnaise" },
-  { category: "Raw Materials (15 days once)", name: "Guntur red chilly" },
-  { category: "Raw Materials (15 days once)", name: "Byadagi red chilly" },
-  { category: "Raw Materials (15 days once)", name: "Besan" },
-  { category: "Raw Materials (15 days once)", name: "Maida" },
-  { category: "Raw Materials (15 days once)", name: "Cornflour" },
-  { category: "Raw Materials (15 days once)", name: "Riceflour" },
-  { category: "Raw Materials (15 days once)", name: "Oats" },
-  { category: "Raw Materials (15 days once)", name: "Cocoa powder" },
-  { category: "Raw Materials (15 days once)", name: "Chia seeds" },
-  { category: "Raw Materials (15 days once)", name: "Peanut butter" },
-  { category: "Raw Materials (15 days once)", name: "Honey" },
-  { category: "Raw Materials (15 days once)", name: "Sugar" },
-  { category: "Raw Materials (15 days once)", name: "Yellow Jaggery (cubes)" },
-  { category: "Raw Materials (15 days once)", name: "Rice paper" },
-  { category: "Raw Materials (15 days once)", name: "Ginger garlic paste" },
-  { category: "Raw Materials (15 days once)", name: "Sev (chaat)" },
-  { category: "Raw Materials (15 days once)", name: "Dryfruits – wet dates" },
-  { category: "Raw Materials (15 days once)", name: "Dryfruits – cashew" },
-  { category: "Raw Materials (15 days once)", name: "Dryfruits – raisins" },
-  { category: "Raw Materials (15 days once)", name: "Dryfruits – almonds" },
-
-  // ===== Masalas and spices (depends) =====
-  { category: "Masalas and spices (depends)", name: "Pepper powder" },
-  { category: "Masalas and spices (depends)", name: "Black salt" },
-  { category: "Masalas and spices (depends)", name: "Pink salt" },
-  {
-    category: "Masalas and spices (depends)",
-    name: "Kashmiri red chilly powder",
-  },
-  { category: "Masalas and spices (depends)", name: "Coriander powder" },
-  { category: "Masalas and spices (depends)", name: "Jeera powder" },
-  { category: "Masalas and spices (depends)", name: "Onion powder" },
-  { category: "Masalas and spices (depends)", name: "Garlic powder" },
-  { category: "Masalas and spices (depends)", name: "Ginger powder" },
-  { category: "Masalas and spices (depends)", name: "Garam masala" },
-  {
-    category: "Masalas and spices (depends)",
-    name: "Dry mango powder (aamchur)",
-  },
-  { category: "Masalas and spices (depends)", name: "Chat masala" },
-  { category: "Masalas and spices (depends)", name: "Chole masala" },
-  { category: "Masalas and spices (depends)", name: "Peri peri masala" },
-  { category: "Masalas and spices (depends)", name: "Cheese powder" },
-  { category: "Masalas and spices (depends)", name: "Chilly flakes" },
-  { category: "Masalas and spices (depends)", name: "Oregano" },
-
-  // ===== Whole spices (depends) =====
-  { category: "Whole spices (depends)", name: "Pepper corn" },
-  { category: "Whole spices (depends)", name: "Fennel (saunf)" },
-  { category: "Whole spices (depends)", name: "Cloves" },
-  { category: "Whole spices (depends)", name: "Jeera" },
-  { category: "Whole spices (depends)", name: "Anardhana powder" },
-  { category: "Whole spices (depends)", name: "Hing" },
-];
 
 type Props = {
   initialDate?: string;
@@ -144,7 +27,7 @@ function toDisplayDate(isoDate: string) {
 }
 
 export default function InventoryForm({ initialDate }: Props) {
-  // inventory part
+  // date + quantities
   const [date, setDate] = useState<string>(
     initialDate ?? new Date().toISOString().slice(0, 10)
   );
@@ -152,18 +35,22 @@ export default function InventoryForm({ initialDate }: Props) {
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState("");
 
-  // chef-added items
-  const [customItems, setCustomItems] = useState<InventoryItem[]>([]);
+  // items from DB
+  const [items, setItems] = useState<InventoryItem[]>([]);
+
+  // add-item ui
   const [showAddItem, setShowAddItem] = useState(false);
   const [newItemCategory, setNewItemCategory] = useState("");
   const [newItemName, setNewItemName] = useState("");
 
-  // delete panel
+  // delete-item ui
   const [showDeleteItem, setShowDeleteItem] = useState(false);
   const [deleteSearch, setDeleteSearch] = useState("");
-  const [hiddenItems, setHiddenItems] = useState<string[]>([]); // keys: category__name
 
-  // inventory data (amount spent) part
+  // hidden (soft deleted for this UI session) – but we also PATCH the DB
+  const [hiddenItems, setHiddenItems] = useState<string[]>([]);
+
+  // spend
   const [spendDate, setSpendDate] = useState<string>(
     new Date().toISOString().slice(0, 10)
   );
@@ -171,32 +58,18 @@ export default function InventoryForm({ initialDate }: Props) {
   const [spendList, setSpendList] = useState<SpendEntry[]>([]);
   const [spendSaving, setSpendSaving] = useState(false);
 
-  // categories only from master
-  const allCategories = useMemo(() => {
-    const set = new Set<string>();
-    MASTER_ITEMS.forEach((it) => set.add(it.category));
-    return Array.from(set);
+  // load items from DB once
+  useEffect(() => {
+    async function loadItems() {
+      const res = await fetch("/api/inventory-items");
+      const data = await res.json();
+      setItems(data);
+      setHiddenItems([]); // reset
+    }
+    loadItems();
   }, []);
 
-  // all items before hiding
-  const allItems = useMemo(
-    () => [...MASTER_ITEMS, ...customItems],
-    [customItems]
-  );
-
-  // grouped master + custom, then hide items in hiddenItems
-  const grouped = useMemo(() => {
-    const map: Record<string, InventoryItem[]> = {};
-    allItems.forEach((it) => {
-      const key = `${it.category}__${it.name}`;
-      if (hiddenItems.includes(key)) return; // skip hidden
-      if (!map[it.category]) map[it.category] = [];
-      map[it.category].push(it);
-    });
-    return map;
-  }, [allItems, hiddenItems]);
-
-  // load inventory
+  // load inventory for selected date
   useEffect(() => {
     async function fetchData() {
       const res = await fetch(`/api/inventory?date=${date}`);
@@ -212,7 +85,7 @@ export default function InventoryForm({ initialDate }: Props) {
       } else {
         setQuantities({});
       }
-      // on date change, you might want to reset hidden items
+      // on date change, clear hidden
       setHiddenItems([]);
     }
     if (date) fetchData();
@@ -230,6 +103,25 @@ export default function InventoryForm({ initialDate }: Props) {
     loadSpends();
   }, []);
 
+  // categories from items
+  const allCategories = useMemo(() => {
+    const set = new Set<string>();
+    items.forEach((it) => set.add(it.category));
+    return Array.from(set);
+  }, [items]);
+
+  // grouped items (excluding hidden)
+  const grouped = useMemo(() => {
+    const map: Record<string, InventoryItem[]> = {};
+    items.forEach((it) => {
+      const key = `${it.category}__${it.name}`;
+      if (hiddenItems.includes(key)) return;
+      if (!map[it.category]) map[it.category] = [];
+      map[it.category].push(it);
+    });
+    return map;
+  }, [items, hiddenItems]);
+
   function handleChange(category: string, name: string, value: string) {
     setQuantities((prev) => ({
       ...prev,
@@ -241,8 +133,8 @@ export default function InventoryForm({ initialDate }: Props) {
     setSaving(true);
     setStatus("");
 
-    // save only visible items (i.e. skip hidden)
-    const itemsToSave = allItems
+    // save only visible items
+    const itemsToSave = items
       .filter((it) => !hiddenItems.includes(`${it.category}__${it.name}`))
       .map((it) => ({
         category: it.category,
@@ -279,7 +171,7 @@ export default function InventoryForm({ initialDate }: Props) {
     doc.setFont(FONT, "normal");
     doc.setFontSize(10);
 
-    const filledItems = allItems
+    const filledItems = items
       .filter((it) => !hiddenItems.includes(`${it.category}__${it.name}`))
       .map((it) => {
         const key = `${it.category}__${it.name}`;
@@ -312,6 +204,66 @@ export default function InventoryForm({ initialDate }: Props) {
     doc.save(`inventory-${displayDate.replace(/\//g, "-")}.pdf`);
   }
 
+  // add item → POST to DB
+  async function handleAddItem() {
+    if (!newItemCategory || !newItemName.trim()) return;
+
+    const payload = {
+      category: newItemCategory,
+      name: newItemName.trim(),
+    };
+
+    const res = await fetch("/api/inventory-items", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (res.ok) {
+      const saved = await res.json();
+      setItems((prev) => {
+        const exists = prev.some(
+          (p) => p.category === saved.category && p.name === saved.name
+        );
+        if (exists) return prev;
+        return [...prev, saved];
+      });
+    }
+
+    setNewItemName("");
+    setShowAddItem(false);
+  }
+
+  // delete item → PATCH to DB + hide locally
+  async function handleDeleteItem(category: string, name: string) {
+    await fetch("/api/inventory-items", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ category, name, active: false }),
+    });
+
+    const key = `${category}__${name}`;
+    setHiddenItems((prev) => (prev.includes(key) ? prev : [...prev, key]));
+
+    // also update items array so it doesn't come back until next GET
+    setItems((prev) =>
+      prev.filter((it) => !(it.category === category && it.name === name))
+    );
+
+    setDeleteSearch("");
+    setShowDeleteItem(false);
+  }
+
+  const deleteCandidates = items
+    .filter((it) => !hiddenItems.includes(`${it.category}__${it.name}`))
+    .filter((it) =>
+      deleteSearch.trim()
+        ? it.name.toLowerCase().includes(deleteSearch.toLowerCase()) ||
+          it.category.toLowerCase().includes(deleteSearch.toLowerCase())
+        : true
+    )
+    .slice(0, 10);
+
   async function handleSpendSave() {
     if (!spendAmount.trim()) return;
     setSpendSaving(true);
@@ -333,47 +285,8 @@ export default function InventoryForm({ initialDate }: Props) {
     setSpendSaving(false);
   }
 
-  function handleAddItem() {
-    if (!newItemCategory || !newItemName.trim()) return;
-    const item: InventoryItem = {
-      category: newItemCategory,
-      name: newItemName.trim(),
-    };
-    setCustomItems((prev) => {
-      const exists = prev.some(
-        (p) => p.category === item.category && p.name === item.name
-      );
-      if (exists) return prev;
-      return [...prev, item];
-    });
-    setNewItemName("");
-    setShowAddItem(false);
-  }
-
-  // delete item handler
-  function handleDeleteItem(key: string) {
-    setHiddenItems((prev) => {
-      if (prev.includes(key)) return prev;
-      return [...prev, key];
-    });
-    setDeleteSearch("");
-    setShowDeleteItem(false);
-  }
-
-  // filter items for delete search
-  const deleteCandidates = allItems
-    .filter((it) => !hiddenItems.includes(`${it.category}__${it.name}`))
-    .filter((it) =>
-      deleteSearch.trim()
-        ? it.name.toLowerCase().includes(deleteSearch.toLowerCase()) ||
-          it.category.toLowerCase().includes(deleteSearch.toLowerCase())
-        : true
-    )
-    .slice(0, 10); // limit to 10 results
-
   return (
     <div className="inventory-wrapper">
-      {/* INVENTORY SECTION */}
       <div className="inventory-header">
         <h1>Daily Inventory</h1>
         <div className="inventory-header-actions">
@@ -393,8 +306,8 @@ export default function InventoryForm({ initialDate }: Props) {
             onClick={() => {
               setShowAddItem((p) => !p);
               setShowDeleteItem(false);
-              if (!newItemCategory) {
-                setNewItemCategory(allCategories[0] || "");
+              if (!newItemCategory && allCategories.length > 0) {
+                setNewItemCategory(allCategories[0]);
               }
             }}
           >
@@ -468,10 +381,10 @@ export default function InventoryForm({ initialDate }: Props) {
               const key = `${it.category}__${it.name}`;
               return (
                 <button
-                    key={key}
-                    type="button"
-                    className="delete-item-row"
-                    onClick={() => handleDeleteItem(key)}
+                  key={key}
+                  type="button"
+                  className="delete-item-row"
+                  onClick={() => handleDeleteItem(it.category, it.name)}
                 >
                   <span className="delete-item-name">{it.name}</span>
                   <span className="delete-item-cat">{it.category}</span>
@@ -483,11 +396,11 @@ export default function InventoryForm({ initialDate }: Props) {
       )}
 
       <div className="inventory-sections">
-        {Object.entries(grouped).map(([cat, items]) => (
+        {Object.entries(grouped).map(([cat, list]) => (
           <div key={cat} className="inventory-section">
             <h2>{cat}</h2>
             <div className="inventory-items">
-              {items.map((it) => {
+              {list.map((it) => {
                 const key = `${it.category}__${it.name}`;
                 return (
                   <div key={key} className="inventory-item-row">
@@ -516,7 +429,7 @@ export default function InventoryForm({ initialDate }: Props) {
         {status && <span className="status-text">{status}</span>}
       </div>
 
-      {/* INVENTORY DATA (AMOUNT SPENT) SECTION */}
+      {/* SPEND SECTION */}
       <div className="spend-wrapper">
         <div className="spend-header">
           <h2>Inventory Data</h2>
